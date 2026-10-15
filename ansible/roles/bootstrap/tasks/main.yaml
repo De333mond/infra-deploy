@@ -1,0 +1,25 @@
+---
+- name: Update and upgrade packages 
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - git
+      - ca-certificates
+      - sudo
+      - python3
+    state: present
+
+- name: Create deploy user
+  ansible.builtin.user:
+    name: deploy
+    shell: /bit/bash
+    create_home: true
+    groups:
+      - sudo
+    append: true
+    state: present

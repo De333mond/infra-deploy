@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/k3s
+k3s_version: "v1.37.0+k3s1"
+k3s_disabled_components:
+  - traefik
+

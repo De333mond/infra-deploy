@@ -1,0 +1,7 @@
+- name: Configure host
+  hosts: all
+  become: true
+
+  roles:
+    - bootstrap
+

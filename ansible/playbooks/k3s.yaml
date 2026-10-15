@@ -1,0 +1,7 @@
+---
+- name: Configure Kubernetes server
+  hosts: all
+  become: true
+
+  roles:
+    - k3s

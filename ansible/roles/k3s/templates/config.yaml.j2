@@ -1,0 +1,5 @@
+---
+disable:
+{% for component in k3s_disabled_components %}
+  - {{ component }}
+{% endfor %}
