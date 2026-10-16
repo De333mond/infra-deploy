@@ -1,0 +1,29 @@
+---
+- name: Bootstrap Flux from GitHub
+  hosts: all
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Check for a local GitHub token
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../local/github-token"
+      register: flux_github_token_file
+      delegate_to: localhost
+      become: false
+
+    - name: Require a local GitHub token
+      ansible.builtin.assert:
+        that:
+          - flux_github_token_file.stat.isreg | default(false)
+          - (flux_github_token_file.stat.size | default(0)) > 0
+          - flux_github_token_file.stat.mode | default('') == '0600'
+        fail_msg: "Create a nonempty local/github-token with mode 0600 before bootstrapping Flux."
+      delegate_to: localhost
+      become: false
+
+    - name: Gather host facts
+      ansible.builtin.setup:
+
+  roles:
+    - flux

@@ -17,7 +17,7 @@
 - name: Create deploy user
   ansible.builtin.user:
     name: deploy
-    shell: /bit/bash
+    shell: /bin/bash
     create_home: true
     groups:
       - sudo

@@ -1,0 +1,6 @@
+---
+flux_version: v2.9.6
+flux_github_owner: De333mond
+flux_github_repository: infra-deploy
+flux_github_branch: main
+flux_cluster_path: clusters/homelab

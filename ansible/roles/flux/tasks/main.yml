@@ -1,0 +1,104 @@
+---
+- name: Require a supported Flux CLI architecture
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'aarch64']
+    fail_msg: "Flux CLI is configured only for x86_64 and aarch64 hosts."
+
+- name: Check K3s kubeconfig
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: flux_kubeconfig
+
+- name: Require K3s before Flux
+  ansible.builtin.assert:
+    that:
+      - flux_kubeconfig.stat.isreg | default(false)
+    fail_msg: "Install K3s with playbooks/k3s.yaml before bootstrapping Flux."
+
+- name: Create Flux CLI version directory
+  ansible.builtin.file:
+    path: "/opt/flux/{{ flux_version }}"
+    state: directory
+    mode: "0755"
+
+- name: Download Flux CLI
+  ansible.builtin.get_url:
+    url: "https://github.com/fluxcd/flux2/releases/download/{{ flux_version }}/flux_{{ flux_version | regex_replace('^v', '') }}_linux_{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}.tar.gz"
+    dest: "/opt/flux/{{ flux_version }}/flux.tar.gz"
+    mode: "0644"
+
+- name: Extract Flux CLI
+  ansible.builtin.unarchive:
+    src: "/opt/flux/{{ flux_version }}/flux.tar.gz"
+    dest: "/opt/flux/{{ flux_version }}"
+    remote_src: true
+    creates: "/opt/flux/{{ flux_version }}/flux"
+
+- name: Install Flux CLI
+  ansible.builtin.copy:
+    src: "/opt/flux/{{ flux_version }}/flux"
+    dest: /usr/local/bin/flux
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check Kubernetes prerequisites for Flux
+  ansible.builtin.command: /usr/local/bin/flux check --pre
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Bootstrap Flux and connect it to GitHub
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/flux
+      - bootstrap
+      - github
+      - "--owner={{ flux_github_owner }}"
+      - "--repository={{ flux_github_repository }}"
+      - "--branch={{ flux_github_branch }}"
+      - "--path={{ flux_cluster_path }}"
+      - --personal
+      - --token-auth=false
+      - --components=source-controller,kustomize-controller
+      - "--version={{ flux_version }}"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+    GITHUB_TOKEN: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../local/github-token') | trim }}"
+  no_log: true
+
+- name: Check Flux controllers
+  ansible.builtin.command: /usr/local/bin/flux check
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Wait for Git repository synchronization
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - wait
+      - --namespace=flux-system
+      - --for=condition=Ready
+      - --timeout=120s
+      - gitrepository/flux-system
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Wait for cluster configuration synchronization
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - wait
+      - --namespace=flux-system
+      - --for=condition=Ready
+      - --timeout=120s
+      - kustomization/flux-system
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
