@@ -62,7 +62,7 @@
       - "--path={{ flux_cluster_path }}"
       - --personal
       - --token-auth=false
-      - --components=source-controller,kustomize-controller
+      - --components=source-controller,kustomize-controller,helm-controller
       - "--version={{ flux_version }}"
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
