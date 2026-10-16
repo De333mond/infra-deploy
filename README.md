@@ -36,4 +36,6 @@ ansible-playbook playbooks/k3s.yaml
 ansible-playbook playbooks/flux.yaml
 ```
 
-Playbook устанавливает закреплённую версию Flux CLI на сервер, запускает `flux bootstrap github` для ветки `main` и пути `clusters/homelab`, а также проверяет контроллеры. Bootstrap создаёт коммит с манифестами Flux в GitHub; после первого запуска синхронизируйте локальный checkout с удалённой веткой. PAT не сохраняется в Kubernetes; там хранится SSH deploy key с доступом к репозиторию только на чтение. Сейчас устанавливаются только `source-controller` и `kustomize-controller`; остальные компоненты добавим вместе с соответствующими ресурсами.
+Playbook устанавливает закреплённую версию Flux CLI на сервер и запускает `flux bootstrap github` для ветки `main` и пути `clusters/homelab`. Bootstrap также обновляет манифесты и компоненты Flux в GitHub. PAT остаётся локальным; в Kubernetes хранится SSH deploy key. После запуска синхронизируйте локальный checkout с удалённой веткой.
+
+Image Automation отслеживает digest тегов приложений и коммитит обновлённые ссылки на образы в `main` только при их изменении. Для этого Flux использует deploy key с правом записи. Настройка этого цикла описана в [docs/flux-todo.md](docs/flux-todo.md); привязки к конкретным приложениям добавляются вместе с их манифестами.
