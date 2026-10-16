@@ -25,7 +25,7 @@ spec:
       spec:
         initContainers:
           - name: init-dind-externals
-            image: ghcr.io/actions/actions-runner:2.333.0
+            image: ghcr.io/actions/actions-runner:2.337.0
             command: [cp, -r, /home/runner/externals/., /home/runner/tmpDir/]
             volumeMounts:
               - name: dind-externals
@@ -57,7 +57,7 @@ spec:
                 readOnly: true
         containers:
           - name: runner
-            image: ghcr.io/actions/actions-runner:2.333.0
+            image: ghcr.io/actions/actions-runner:2.337.0
             command: [/home/runner/run.sh]
             env:
               - name: DOCKER_HOST
