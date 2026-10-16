@@ -1,0 +1,100 @@
+---
+- name: Check that K3s is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: registry_k3s_binary
+
+- name: Require K3s before configuring the registry mirror
+  ansible.builtin.assert:
+    that:
+      - registry_k3s_binary.stat.exists
+    fail_msg: Install K3s before configuring its registry mirror.
+
+- name: Create local registry CA directory
+  ansible.builtin.file:
+    path: "{{ registry_local_ca_directory }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check local registry CA certificate
+  ansible.builtin.stat:
+    path: "{{ registry_local_ca_directory }}/ca.crt"
+  register: registry_ca_cert
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check local registry CA private key
+  ansible.builtin.stat:
+    path: "{{ registry_local_ca_directory }}/ca.key"
+  register: registry_ca_key
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Require a complete existing CA
+  ansible.builtin.assert:
+    that:
+      - registry_ca_cert.stat.exists == registry_ca_key.stat.exists
+    fail_msg: Restore both local/registry/ca.crt and local/registry/ca.key, or remove both to create a new CA.
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Create registry CA if missing
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - req
+      - -x509
+      - -newkey
+      - rsa:3072
+      - -sha256
+      - -days
+      - "3650"
+      - -nodes
+      - -subj
+      - /CN=infra-deploy-registry-CA
+      - -addext
+      - basicConstraints=critical,CA:TRUE
+      - -addext
+      - keyUsage=critical,keyCertSign,cRLSign
+      - -keyout
+      - "{{ registry_local_ca_directory }}/ca.key"
+      - -out
+      - "{{ registry_local_ca_directory }}/ca.crt"
+    creates: "{{ registry_local_ca_directory }}/ca.crt"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not registry_ca_cert.stat.exists
+
+- name: Protect local registry CA private key
+  ansible.builtin.file:
+    path: "{{ registry_local_ca_directory }}/ca.key"
+    state: file
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Install registry CA certificate on the node
+  ansible.builtin.copy:
+    src: "{{ registry_local_ca_directory }}/ca.crt"
+    dest: "{{ registry_node_ca_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart K3s
+
+- name: Configure the K3s registry mirror
+  ansible.builtin.template:
+    src: registries.yaml.j2
+    dest: /etc/rancher/k3s/registries.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart K3s

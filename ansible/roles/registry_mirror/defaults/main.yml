@@ -1,0 +1,6 @@
+---
+registry_image_host: registry.registry.svc.cluster.local:5000
+registry_node_port: 32443
+registry_mirror_endpoint: "https://{{ ansible_host }}:{{ registry_node_port }}"
+registry_local_ca_directory: "{{ playbook_dir }}/../../local/registry"
+registry_node_ca_path: /etc/rancher/k3s/registry-ca.crt

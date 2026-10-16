@@ -1,0 +1,160 @@
+---
+- name: Prepare local registry certificate and password
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ playbook_dir }}/../scripts/prepare_registry_secrets.py"
+      - "{{ registry_local_directory }}"
+      - "{{ registry_node_ip }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: registry_local_secrets
+  changed_when: registry_local_secrets.stdout == 'created'
+
+- name: Create registry namespace
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - apply
+      - --field-manager=ansible
+      - -f
+      - "-"
+    stdin: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: registry
+  register: registry_namespace_result
+  changed_when: "'unchanged' not in registry_namespace_result.stdout"
+
+- name: Create temporary directory for registry credentials
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: registry-secrets-
+  register: registry_remote_directory
+
+- name: Install registry Kubernetes secrets
+  block:
+    - name: Copy registry certificate
+      ansible.builtin.copy:
+        src: "{{ registry_local_directory }}/server.crt"
+        dest: "{{ registry_remote_directory.path }}/tls.crt"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Copy registry private key
+      ansible.builtin.copy:
+        src: "{{ registry_local_directory }}/server.key"
+        dest: "{{ registry_remote_directory.path }}/tls.key"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Copy registry htpasswd
+      ansible.builtin.copy:
+        src: "{{ registry_local_directory }}/htpasswd"
+        dest: "{{ registry_remote_directory.path }}/htpasswd"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Render registry TLS Secret
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - create
+          - secret
+          - generic
+          - registry-tls
+          - --namespace=registry
+          - "--from-file=tls.crt={{ registry_remote_directory.path }}/tls.crt"
+          - "--from-file=tls.key={{ registry_remote_directory.path }}/tls.key"
+          - --dry-run=client
+          - -o=yaml
+      register: registry_tls_manifest
+      changed_when: false
+      no_log: true
+
+    - name: Apply registry TLS Secret
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - apply
+          - --field-manager=ansible
+          - -f
+          - "-"
+        stdin: "{{ registry_tls_manifest.stdout }}"
+      register: registry_tls_result
+      changed_when: "'unchanged' not in registry_tls_result.stdout"
+      no_log: true
+
+    - name: Render registry auth Secret
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - create
+          - secret
+          - generic
+          - registry-auth
+          - --namespace=registry
+          - "--from-file=htpasswd={{ registry_remote_directory.path }}/htpasswd"
+          - --dry-run=client
+          - -o=yaml
+      register: registry_auth_manifest
+      changed_when: false
+      no_log: true
+
+    - name: Apply registry auth Secret
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - apply
+          - --field-manager=ansible
+          - -f
+          - "-"
+        stdin: "{{ registry_auth_manifest.stdout }}"
+      register: registry_auth_result
+      changed_when: "'unchanged' not in registry_auth_result.stdout"
+      no_log: true
+  always:
+    - name: Remove temporary registry credentials
+      ansible.builtin.file:
+        path: "{{ registry_remote_directory.path }}"
+        state: absent
+      no_log: true
+
+- name: Check whether registry is deployed
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - get
+      - deployment/registry
+      - --namespace=registry
+      - -o=name
+  register: registry_deployment
+  failed_when: false
+  changed_when: false
+
+- name: Restart registry after credentials change
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - rollout
+      - restart
+      - deployment/registry
+      - --namespace=registry
+  when:
+    - registry_deployment.rc == 0
+    - registry_tls_result.changed or registry_auth_result.changed

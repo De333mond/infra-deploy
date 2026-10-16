@@ -1,6 +1,6 @@
 # Infrastructure deployment
 
-Принятые решения и открытые вопросы: [docs/decisions.md](docs/decisions.md). Задачи по Flux CD: [docs/flux-todo.md](docs/flux-todo.md).
+Принятые решения и открытые вопросы: [docs/decisions.md](docs/decisions.md). Задачи по Flux CD: [docs/flux-todo.md](docs/flux-todo.md). Настройка локального registry и зеркала K3s: [docs/registry-mirror.md](docs/registry-mirror.md).
 
 Ansible использует локальный inventory как конфиг подключения к серверу. При первом запуске создайте его из примера и укажите адрес сервера, SSH-пользователя, порт и при необходимости путь к SSH-ключу:
 

@@ -1,0 +1,3 @@
+---
+registry_local_directory: "{{ playbook_dir }}/../../local/registry"
+registry_node_ip: "{{ ansible_host }}"

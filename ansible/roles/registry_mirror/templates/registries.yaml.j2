@@ -1,0 +1,9 @@
+---
+mirrors:
+  "{{ registry_image_host }}":
+    endpoint:
+      - "{{ registry_mirror_endpoint }}"
+configs:
+  "{{ ansible_host }}:{{ registry_node_port }}":
+    tls:
+      ca_file: "{{ registry_node_ca_path }}"

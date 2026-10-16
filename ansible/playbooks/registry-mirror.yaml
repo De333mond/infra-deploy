@@ -1,0 +1,7 @@
+---
+- name: Configure K3s image pulls from the local registry
+  hosts: all
+  become: true
+
+  roles:
+    - registry_mirror
