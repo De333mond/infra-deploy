@@ -22,7 +22,15 @@ ansible-playbook playbooks/k3s.yaml
 
 Исходные секреты для первоначальной настройки и будущий закрытый ключ age храните в `local/` (`mkdir -m 700 local`); каталог исключён из Git.
 
-Для первоначальной установки Flux создайте `local/github-token` с правами `0600`. Для fine-grained GitHub PAT владельца существующего репозитория `De333mond/infra-deploy` нужны `Administration: Read and write`, `Contents: Read and write`, `Metadata: Read-only`; классическому токену достаточно scope `repo`. Затем выполните из каталога `ansible`:
+Создайте `local/github-token` с правами `0600`. Один fine-grained PAT для текущих задач должен иметь доступ к репозиторию `De333mond/infra-deploy` и такие разрешения:
+
+| Разрешение репозитория | Доступ | Для чего нужно |
+| --- | --- | --- |
+| Administration | Read and write | Flux bootstrap создаёт deploy key; ARC регистрирует и управляет runner |
+| Contents | Read and write | Flux bootstrap записывает свои манифесты в репозиторий |
+| Metadata | Read-only | Базовый доступ к метаданным репозитория, требуется GitHub API |
+
+Для classic PAT нужен scope `repo`. Затем выполните из каталога `ansible`:
 
 ```sh
 ansible-playbook playbooks/flux.yaml
