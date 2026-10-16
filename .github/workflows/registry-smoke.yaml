@@ -1,0 +1,38 @@
+name: Registry smoke test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  registry-smoke:
+    runs-on: homelab-runners
+    timeout-minutes: 10
+    env:
+      REGISTRY: registry.registry.svc.cluster.local:5000
+      IMAGE: registry.registry.svc.cluster.local:5000/runner-smoke:${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Check Docker daemon
+        run: docker info
+
+      - name: Log in to registry
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USERNAME" --password-stdin
+
+      - name: Build and push test image
+        shell: bash
+        run: |
+          context="$RUNNER_TEMP/registry-smoke"
+          mkdir -p "$context"
+          cat > "$context/Dockerfile" <<'EOF'
+          FROM scratch
+          COPY payload.txt /payload.txt
+          EOF
+          printf 'runner smoke test %s\n' "$GITHUB_RUN_ID" > "$context/payload.txt"
+          docker build --tag "$IMAGE" "$context"
+          docker push "$IMAGE"
+
+      - name: Pull test image
+        run: docker pull "$IMAGE"
