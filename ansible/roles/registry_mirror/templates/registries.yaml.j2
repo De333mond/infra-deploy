@@ -5,5 +5,8 @@ mirrors:
       - "{{ registry_mirror_endpoint }}"
 configs:
   "{{ ansible_host }}:{{ registry_node_port }}":
+    auth:
+      username: registry
+      password: "{{ lookup('ansible.builtin.file', registry_local_ca_directory ~ '/password') | trim }}"
     tls:
       ca_file: "{{ registry_node_ca_path }}"

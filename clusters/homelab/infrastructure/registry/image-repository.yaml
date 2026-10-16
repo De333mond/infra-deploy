@@ -1,0 +1,12 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: runner-smoke
+  namespace: flux-system
+spec:
+  image: registry.registry.svc.cluster.local:5000/runner-smoke
+  interval: 1m
+  secretRef:
+    name: registry-pull-auth
+  certSecretRef:
+    name: registry-ca

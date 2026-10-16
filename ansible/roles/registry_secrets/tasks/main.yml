@@ -29,6 +29,52 @@
   register: registry_namespace_result
   changed_when: "'unchanged' not in registry_namespace_result.stdout"
 
+- name: Read registry password for Flux credentials
+  ansible.builtin.set_fact:
+    registry_flux_password: "{{ lookup('ansible.builtin.file', registry_local_directory ~ '/password') | trim }}"
+  no_log: true
+
+- name: Prepare Flux registry pull credentials and CA
+  ansible.builtin.set_fact:
+    registry_flux_docker_config: >-
+      {{ {'auths': {registry_image_host: {
+        'username': 'registry',
+        'password': registry_flux_password,
+        'auth': ('registry:' ~ registry_flux_password) | b64encode
+      }}} | to_json }}
+    registry_flux_ca_b64: "{{ lookup('ansible.builtin.file', registry_local_directory ~ '/ca.crt') | b64encode }}"
+  no_log: true
+
+- name: Apply Flux registry pull credentials and CA
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/k3s
+      - kubectl
+      - apply
+      - --field-manager=ansible
+      - -f
+      - "-"
+    stdin: "{{ lookup('ansible.builtin.template', 'flux-registry-secrets.yaml.j2') }}"
+  register: registry_flux_secrets_result
+  changed_when:
+    - registry_flux_secrets_result.rc == 0
+    - "'unchanged' not in registry_flux_secrets_result.stdout"
+  failed_when: false
+  no_log: true
+
+- name: Report Flux registry Secret apply failure without exposing credentials
+  ansible.builtin.fail:
+    msg: >-
+      kubectl apply failed (rc={{ registry_flux_secrets_result.rc }}):
+      {{ registry_flux_secrets_result.stderr
+         | default('')
+         | replace(registry_flux_password, '[REDACTED]')
+         | replace(registry_flux_password | b64encode, '[REDACTED]')
+         | replace(registry_flux_docker_config, '[REDACTED]')
+         | replace(registry_flux_ca_b64, '[REDACTED]')
+         | trim }}
+  when: registry_flux_secrets_result.rc != 0
+
 - name: Create temporary directory for registry credentials
   ansible.builtin.tempfile:
     state: directory
